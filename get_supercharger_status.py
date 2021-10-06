@@ -80,7 +80,7 @@ def main():
         superchargers_json = charging_sites_json['response']['superchargers']
         logger.debug(json.dumps(charging_sites_json, indent=4, sort_keys=True))
         logger.info("\n\n*Singapore SC Slots Free*")
-        tweet_str = "Singapore SC Slots Free #Supercharger\n"
+        tweet_str = "Singapore SC Slots Free #TLKPSC\n"
         for supercharger in superchargers_json:
             logger.info(f"{supercharger['name']} : {supercharger['available_stalls']}/{supercharger['total_stalls']}")
             tweet_str += f"{supercharger['name']} : {supercharger['available_stalls']}/{supercharger['total_stalls']}\n"
