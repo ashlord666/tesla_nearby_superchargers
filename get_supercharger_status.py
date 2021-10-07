@@ -3,6 +3,7 @@ import json
 import sys
 import logging
 import time
+import traceback
 from datetime import datetime
 from twython import Twython
 from tendo import singleton
@@ -42,6 +43,9 @@ def main():
     TWITTER_ACCESS_TOKEN = ""
     TWITTER_ACCESS_TOKEN_SECRET = ""
 
+    # Flag to turn on and off the waking logic
+    WAKE_ENABLED = True
+
     with open("config.json", "r") as jsonfile:
         data = json.load(jsonfile)
         print("Read successful")
@@ -72,36 +76,52 @@ def main():
         vehicles_json = vehicles_ret.json()
         vehicle_0_id = vehicles_json['response'][0]['id']
         vehicle_0_state = vehicles_json['response'][0]['state']
+
         # If car is asleep, we need to wake it
         if vehicle_0_state.lower() != "online":
+
+            # Check whether to proceed with wake or just abort
+            if not WAKE_ENABLED:
+                logger.error("Car is not online but WAKE_ENABLED is also disabled")
+                return
+
             # Wake it once
             logger.debug(f"Current state is {vehicle_0_state}")
             logger.info("Triggering a wake command")
             wake_url = f"https://owner-api.teslamotors.com/api/1/vehicles/{vehicle_0_id}/wake_up"
             wake_ret = my_session.post(wake_url)
-            logger.debug(f"HTTP Code: {wake_ret.status_code}, Text: {wake_ret.text}")
+            logger.debug(f"HTTP Code: {wake_ret.status_code}")
+
             # Wait until the car is awake
             counter = 0
-            while counter < 5:
+            while counter < 10:
+
                 # Sleep for 5 seconds
-                time.sleep(10)
+                logger.debug("Sleeping thread for 6s")
+                time.sleep(6)
+                logger.debug("Waking thread")
                 vehicle_data_url = f"https://owner-api.teslamotors.com/api/1/vehicles/{vehicle_0_id}/vehicle_data"
                 vehicle_data_ret = my_session.get(vehicle_data_url)
+
                 # Don't abort even if this fails because car is in the middle of waking up
                 if vehicle_data_ret.status_code != 200:
-                    logger.error(f"Unexpected status code {vehicle_data_ret.status_code} for {vehicle_data_url}")
+                    logger.error(f"Status code {vehicle_data_ret.status_code} for {vehicle_data_url}")
                 else:
                     vehicle_data_json = vehicle_data_ret.json()
-                    vehicle_0_state = vehicle_data_json['state']
+                    logger.debug(vehicle_data_json)
+                    vehicle_0_state = vehicle_data_json['response']['state']
+
                 # If the prev status check failed, state is the same
                 logger.debug(f"Counter: {counter}, State: {vehicle_0_state}")
                 if vehicle_0_state.lower() == "online":
                     logger.debug("Car is online. Continuing.")
-                    continue
-                if counter >= 4:
+                    break
+                if counter >= 9:
                     logger.error("Failed to wake car up. Skipping run.")
                     return
                 counter = counter + 1
+
+        # Car should be awake at this point, so just go ahead and query for the nearby charging sites
         charging_sites_url = f"https://owner-api.teslamotors.com/api/1/vehicles/{vehicle_0_id}/nearby_charging_sites"
         charging_sites_ret = my_session.get(charging_sites_url)
         if charging_sites_ret.status_code != 200:
@@ -124,6 +144,7 @@ def main():
     except:
         e = sys.exc_info()
         logger.error(e)
+        logger.error(traceback.format_exc())
         return
 
     #twitter = Twython(
@@ -133,7 +154,6 @@ def main():
     #    TWITTER_ACCESS_TOKEN_SECRET
     #)
     #twitter.update_status(status=tweet_str)
-
 
 if __name__ == '__main__':
     main()
