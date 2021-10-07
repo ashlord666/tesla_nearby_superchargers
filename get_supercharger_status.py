@@ -105,7 +105,7 @@ def main():
 
                 # Don't abort even if this fails because car is in the middle of waking up
                 if vehicle_data_ret.status_code != 200:
-                    logger.error(f"Status code {vehicle_data_ret.status_code} for {vehicle_data_url}")
+                    logger.debug(f"Status code {vehicle_data_ret.status_code} for {vehicle_data_url}")
                 else:
                     vehicle_data_json = vehicle_data_ret.json()
                     logger.debug(vehicle_data_json)
