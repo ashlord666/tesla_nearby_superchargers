@@ -2,8 +2,8 @@
 
 1. Create a logs folder
 2. Rename config.json.sample to config.json
-3. Use Tesla Tokens to generate the Owner API Access Token
-4. Copy that value into config.json
+3. Run access_token.py to generate the access_token and refresh_token. Follow the instructions given in the prompts
+4. Copy access_token and refresh_token values into config.json
 5. Add the required libs inside requirements.txt
 6. Simply run it
 

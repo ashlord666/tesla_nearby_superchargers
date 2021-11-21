@@ -4,6 +4,7 @@ import sys
 import logging
 import time
 import traceback
+import requests
 from datetime import datetime
 from twython import Twython
 from tendo import singleton
@@ -38,6 +39,7 @@ def main():
     TESLA_CLIENT_ID = ""
     TESLA_CLIENT_SECRET = ""
     ACCESS_TOKEN = ""
+    REFRESH_TOKEN = ""
     TWITTER_CONSUMER_KEY = ""
     TWITTER_CONSUMER_SECRET = ""
     TWITTER_ACCESS_TOKEN = ""
@@ -52,6 +54,7 @@ def main():
         TESLA_CLIENT_ID = data['TESLA_CLIENT_ID']
         TESLA_CLIENT_SECRET = data['TESLA_CLIENT_SECRET']
         ACCESS_TOKEN = data['ACCESS_TOKEN']
+        REFRESH_TOKEN = data['REFRESH_TOKEN']
         TWITTER_CONSUMER_KEY = data['TWITTER_CONSUMER_KEY']
         TWITTER_CONSUMER_SECRET = data['TWITTER_CONSUMER_SECRET']
         TWITTER_ACCESS_TOKEN = data['TWITTER_ACCESS_TOKEN']
@@ -71,7 +74,42 @@ def main():
         vehicles_ret = my_session.get(vehicle_list_url)
         if vehicles_ret.status_code != 200:
             logger.error(f"Unexpected status code {vehicles_ret.status_code} for {vehicle_list_url}")
+
+            if vehicles_ret.status_code == 401:
+                payload  = {
+                    "grant_type": 'refresh_token',
+                    "refresh_token": REFRESH_TOKEN,
+                    "client_id": TESLA_CLIENT_ID,
+                    "client_secret": TESLA_CLIENT_SECRET,
+                }
+                refresh_res = requests.post(url="https://owner-api.teslamotors.com/oauth/token", json=payload)
+                logger.debug(refresh_res.text)
+                refresh_res_json = refresh_res.json()
+                logger.debug(f"Received refresh response: {refresh_res_json}")
+                logger.info("Received new access_token.")
+                new_access_token = refresh_res_json['access_token']
+                new_refresh_token = refresh_res_json['refresh_token']
+                logger.info(f"New access token created at {datetime.fromtimestamp(refresh_res_json['created_at'])} and expires in {refresh_res_json['expires_in']} seconds.")
+                logger.info(f"New refresh token created at {datetime.fromtimestamp(refresh_res_json['created_at'])}")
+                
+                new_config = {
+                    "TESLA_CLIENT_ID": TESLA_CLIENT_ID,
+                    "TESLA_CLIENT_SECRET": TESLA_CLIENT_SECRET,
+                    "ACCESS_TOKEN": new_access_token,
+                    "REFRESH_TOKEN": new_refresh_token,
+                    "TWITTER_CONSUMER_KEY": TWITTER_CONSUMER_KEY,
+                    "TWITTER_CONSUMER_SECRET": TWITTER_CONSUMER_SECRET,
+                    "TWITTER_ACCESS_TOKEN": TWITTER_ACCESS_TOKEN,
+                    "TWITTER_ACCESS_TOKEN_SECRET": TWITTER_ACCESS_TOKEN_SECRET
+                }
+
+                with open('config.json', 'w', encoding='utf-8') as configfile:
+                    json.dump(new_config, configfile, ensure_ascii=False, indent=4)
+                logger.debug("Write new data to config.json and quitting.")
+
+            # Abort the current run since our initial return code is not 200
             return
+
         logger.debug(vehicles_ret.text)
         vehicles_json = vehicles_ret.json()
         vehicle_0_id = vehicles_json['response'][0]['id']
